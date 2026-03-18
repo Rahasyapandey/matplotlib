@@ -255,12 +255,32 @@ Supported properties are
             # clear stale callback
             self.stale_callback = None
             _ax_flag = False
-            if hasattr(self, 'axes') and self.axes:
-                # remove from the mouse hit list
-                self.axes._mouseover_set.discard(self)
-                self.axes.stale = True
-                self.axes = None  # decouple the artist from the Axes
-                _ax_flag = True
+            def remove(self):
+        p = getattr(self, 'parent', None) or getattr(self, 'figure', None)
+        if p is None: return
+
+        if hasattr(self, 'axes') and self.axes:
+            axs = self.axes if isinstance(self.axes, list) else [self.axes]
+            for ax in axs:
+                if hasattr(ax, '_mouseover_set'):
+                    ax._mouseover_set.discard(self)
+                    ax.stale = True
+            try:
+                self.axes = None
+            except AttributeError:
+                pass
+
+        if hasattr(p, 'canvas') and p.canvas and hasattr(p.canvas, 'release_mouseover'):
+            p.canvas.release_mouseover(self)
+            
+        if hasattr(p, 'artists') and self in p.artists:
+            p.artists.remove(self)
+        
+        p.stale = True
+        try:
+            self.parent = None
+        except AttributeError:
+            pass
 
             if (fig := self.get_figure(root=False)) is not None:
                 if not _ax_flag:
